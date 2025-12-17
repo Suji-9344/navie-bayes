@@ -1,59 +1,47 @@
 import streamlit as st
 import pandas as pd
-from sklearn.naive_bayes import GaussianNB
-from sklearn.preprocessing import LabelEncoder
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
 
-# ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="Naive Bayes Student Prediction", layout="wide")
-st.title("🎓 Student Result Prediction (Naive Bayes)")
+st.set_page_config(page_title="Pass/Fail Prediction", layout="wide")
+st.title("📊 Student Pass/Fail Prediction App")
 
-# ---------------- DATASET (BUILT-IN) ----------------
+# ---------- USER INPUT ----------
+st.sidebar.header("🔧 Enter Student Data")
+study_hours = st.sidebar.number_input("Study Hours", min_value=0.0, value=5.0)
+attendance = st.sidebar.number_input("Attendance (%)", min_value=0.0, max_value=100.0, value=75.0)
+
+# ---------- SAMPLE TRAINING DATA ----------
+# For demo, we create a small dataset
 data = {
-    "Hours_Studied": [1,2,3,4,5,6,7,8,9,10]*10,
-    "Attendance": ["Low","Low","Low","Medium","Medium","High","High","High","High","High"]*10,
-    "Internet_Access": ["Yes","No"]*50,
-    "Result": ["Fail","Fail","Fail","Fail","Pass","Pass","Pass","Pass","Pass","Pass"]*10
+    'StudyHours': [2, 4, 6, 8, 10, 1, 3, 7, 9, 5],
+    'Attendance': [50, 60, 70, 80, 90, 40, 55, 85, 95, 65],
+    'PassFail': [0, 0, 1, 1, 1, 0, 0, 1, 1, 1]  # 0 = Fail, 1 = Pass
 }
-
 df = pd.DataFrame(data)
 
-# ---------------- ENCODE CATEGORICAL DATA ----------------
-le_att = LabelEncoder()
-le_net = LabelEncoder()
-le_res = LabelEncoder()
+# ---------- MODEL TRAINING ----------
+X = df[['StudyHours', 'Attendance']]
+y = df['PassFail']
 
-df["Attendance"] = le_att.fit_transform(df["Attendance"])
-df["Internet_Access"] = le_net.fit_transform(df["Internet_Access"])
-df["Result"] = le_res.fit_transform(df["Result"])
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
 
-X = df[["Hours_Studied", "Attendance", "Internet_Access"]]
-y = df["Result"]
+model = LogisticRegression()
+model.fit(X_scaled, y)
 
-# ---------------- TRAIN MODEL ----------------
-model = GaussianNB()
-model.fit(X, y)
+# ---------- USER INPUT PREDICTION ----------
+user_input = pd.DataFrame({'StudyHours':[study_hours], 'Attendance':[attendance]})
+user_input_scaled = scaler.transform(user_input)
 
-# ---------------- USER INPUT ----------------
-st.sidebar.header("🔧 Enter Student Details")
+prediction = model.predict(user_input_scaled)[0]
+prediction_proba = model.predict_proba(user_input_scaled)[0][prediction]
 
-hours = st.sidebar.slider("Hours Studied", 1, 10, 5)
-attendance = st.sidebar.selectbox("Attendance", ["Low", "Medium", "High"])
-internet = st.sidebar.selectbox("Internet Access", ["Yes", "No"])
+# ---------- DISPLAY RESULTS ----------
+st.write("### Student Data")
+st.table(user_input)
 
-# Encode input
-attendance_enc = le_att.transform([attendance])[0]
-internet_enc = le_net.transform([internet])[0]
+st.write("### Prediction Result")
+result = "✅ Pass" if prediction == 1 else "❌ Fail"
+st.write(f"Prediction: **{result}** with probability {prediction_proba:.2f}")
 
-# ---------------- PREDICTION ----------------
-prediction = model.predict([[hours, attendance_enc, internet_enc]])
-result = le_res.inverse_transform(prediction)[0]
-
-# ---------------- OUTPUT ----------------
-st.subheader("📊 Prediction Result")
-
-if result == "Pass":
-    st.success("✅ Student will PASS")
-else:
-    st.error("❌ Student will FAIL")
-
-# ---------------- SHOW DATA ---------
